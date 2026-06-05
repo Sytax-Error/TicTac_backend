@@ -169,6 +169,7 @@ io.on("connection", (socket) => {
       winningCells: rooms[roomId].winningCells,
       score: rooms[roomId].score,
     });
+    console.log("total rooms: ", rooms);
   });
 
   socket.on("make-move", (data) => {
@@ -301,6 +302,71 @@ io.on("connection", (socket) => {
       delete rooms[roomId];
       return;
     }
+    io.to(roomId).emit("room-update", {
+      roomId,
+      players: room.players,
+      board: room.board,
+      currentTurn: room.currentTurn,
+      winner: room.winner,
+      winningCells: room.winningCells,
+      score: room.score,
+    });
+  });
+
+  socket.on("play-again-requested", ({ roomId }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+
+    const player = room.players.find((p) => p.socketId === socket.id);
+
+    if (!player) return;
+    console.log("request get");
+
+    socket.to(roomId).emit("play-again-requested", {
+      username: player.username,
+      symbol: player.symbol,
+      message: `${player.username} wants to play again`,
+    });
+  });
+
+  socket.on("play-again-accepted", ({ roomId }) => {
+    const room = rooms[roomId];
+
+    if (!room) return;
+
+    room.board = createBoard();
+    room.currentTurn = "X";
+    room.winner = null;
+    room.winningCells = [];
+
+    io.to(roomId).emit("room-update", {
+      roomId,
+      players: room.players,
+      board: room.board,
+      currentTurn: room.currentTurn,
+      winner: room.winner,
+      winningCells: room.winningCells,
+      score: room.score,
+    });
+
+    io.to(roomId).emit("play-again-started");
+  });
+
+  socket.on("play-again-rejected", ({ roomId }) => {
+    const room = rooms[roomId];
+
+    if (!room) return;
+
+    const player = room.players.find((p) => p.socketId === socket.id);
+
+    if (!player) return;
+
+    socket.to(roomId).emit("play-again-rejected", {
+      message: `${player.username} rejected the play again request`,
+    });
+
+    delete rooms[roomId];
+
     io.to(roomId).emit("room-update", {
       roomId,
       players: room.players,
