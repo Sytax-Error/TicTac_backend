@@ -96,6 +96,22 @@ function checkDraw(board) {
   return board.flat().every((cell) => cell !== 0);
 }
 
+function emitRoomUpdate(roomId) {
+  const room = rooms[roomId];
+
+  if (!room) return;
+
+  io.to(roomId).emit("room-update", {
+    roomId,
+    players: room.players,
+    board: room.board,
+    currentTurn: room.currentTurn,
+    winner: room.winner,
+    winningCells: room.winningCells,
+    score: room.score,
+  });
+}
+
 io.on("connection", (socket) => {
   // If THIS user sends event "join-room"
   // then run this function
@@ -124,8 +140,11 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // only tow playes allowed on single room
+    // only two players allowed in a single room
     if (rooms[roomId].players.length >= 2) {
+      socket.emit("move-error", {
+        message: "Room is full",
+      });
       return;
     }
 
@@ -160,16 +179,7 @@ io.on("connection", (socket) => {
     });
 
     // send updated players to everyone in room
-    io.to(roomId).emit("room-update", {
-      roomId,
-      players: rooms[roomId].players,
-      board: rooms[roomId].board,
-      currentTurn: rooms[roomId].currentTurn,
-      winner: rooms[roomId].winner,
-      winningCells: rooms[roomId].winningCells,
-      score: rooms[roomId].score,
-    });
-    console.log("total rooms: ", rooms);
+    emitRoomUpdate(roomId);
   });
 
   socket.on("make-move", (data) => {
@@ -202,6 +212,13 @@ io.on("connection", (socket) => {
       return;
     }
 
+    if (rowIndex < 0 || rowIndex > 2 || colIndex < 0 || colIndex > 2) {
+      socket.emit("move-error", {
+        message: "Invalid board position",
+      });
+      return;
+    }
+
     if (room.board[rowIndex][colIndex] !== 0) {
       socket.emit("move-error", {
         message: "This cell is already filled",
@@ -225,15 +242,7 @@ io.on("connection", (socket) => {
       room.currentTurn = room.currentTurn === "X" ? "O" : "X";
     }
 
-    io.to(roomId).emit("room-update", {
-      roomId,
-      players: room.players,
-      board: room.board,
-      currentTurn: room.currentTurn,
-      winner: room.winner,
-      winningCells: room.winningCells,
-      score: room.score,
-    });
+    emitRoomUpdate(roomId);
   });
 
   socket.on("disconnect", () => {
@@ -249,15 +258,7 @@ io.on("connection", (socket) => {
         continue;
       }
 
-      io.to(roomId).emit("room-update", {
-        roomId,
-        players: room.players,
-        board: room.board,
-        currentTurn: room.currentTurn,
-        winner: room.winner,
-        winningCells: room.winningCells,
-        score: room.score,
-      });
+      emitRoomUpdate(roomId);
     }
   });
 
@@ -269,15 +270,7 @@ io.on("connection", (socket) => {
     room.currentTurn = "X";
     room.winner = null;
 
-    io.to(roomId).emit("room-update", {
-      roomId,
-      players: room.players,
-      board: room.board,
-      currentTurn: room.currentTurn,
-      winner: room.winner,
-      winningCells: room.winningCells,
-      score: room.score,
-    });
+    emitRoomUpdate(roomId);
   });
 
   socket.on("leave-room", ({ roomId }) => {
@@ -302,25 +295,16 @@ io.on("connection", (socket) => {
       delete rooms[roomId];
       return;
     }
-    io.to(roomId).emit("room-update", {
-      roomId,
-      players: room.players,
-      board: room.board,
-      currentTurn: room.currentTurn,
-      winner: room.winner,
-      winningCells: room.winningCells,
-      score: room.score,
-    });
+    emitRoomUpdate(roomId);
   });
 
-  socket.on("play-again-requested", ({ roomId }) => {
+  socket.on("play-again-request", ({ roomId }) => {
     const room = rooms[roomId];
     if (!room) return;
 
     const player = room.players.find((p) => p.socketId === socket.id);
 
     if (!player) return;
-    console.log("request get");
 
     socket.to(roomId).emit("play-again-requested", {
       username: player.username,
@@ -339,15 +323,7 @@ io.on("connection", (socket) => {
     room.winner = null;
     room.winningCells = [];
 
-    io.to(roomId).emit("room-update", {
-      roomId,
-      players: room.players,
-      board: room.board,
-      currentTurn: room.currentTurn,
-      winner: room.winner,
-      winningCells: room.winningCells,
-      score: room.score,
-    });
+    emitRoomUpdate(roomId);
 
     io.to(roomId).emit("play-again-started");
   });
@@ -363,18 +339,6 @@ io.on("connection", (socket) => {
 
     socket.to(roomId).emit("play-again-rejected", {
       message: `${player.username} rejected the play again request`,
-    });
-
-    delete rooms[roomId];
-
-    io.to(roomId).emit("room-update", {
-      roomId,
-      players: room.players,
-      board: room.board,
-      currentTurn: room.currentTurn,
-      winner: room.winner,
-      winningCells: room.winningCells,
-      score: room.score,
     });
   });
 });
