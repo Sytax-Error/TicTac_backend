@@ -33,28 +33,59 @@ const createBoard = () => [
 
 function checkWinner(board) {
   const lines = [
-    // rows
-    [board[0][0], board[0][1], board[0][2]],
-    [board[1][0], board[1][1], board[1][2]],
-    [board[2][0], board[2][1], board[2][2]],
+    [
+      [0, 0],
+      [0, 1],
+      [0, 2],
+    ],
+    [
+      [1, 0],
+      [1, 1],
+      [1, 2],
+    ],
+    [
+      [2, 0],
+      [2, 1],
+      [2, 2],
+    ],
 
-    // columns
-    [board[0][0], board[1][0], board[2][0]],
-    [board[0][1], board[1][1], board[2][1]],
-    [board[0][2], board[1][2], board[2][2]],
+    [
+      [0, 0],
+      [1, 0],
+      [2, 0],
+    ],
+    [
+      [0, 1],
+      [1, 1],
+      [2, 1],
+    ],
+    [
+      [0, 2],
+      [1, 2],
+      [2, 2],
+    ],
 
-    // diagonals
-    [board[0][0], board[1][1], board[2][2]],
-    [board[0][2], board[1][1], board[2][0]],
+    [
+      [0, 0],
+      [1, 1],
+      [2, 2],
+    ],
+    [
+      [0, 2],
+      [1, 1],
+      [2, 0],
+    ],
   ];
 
   for (const line of lines) {
-    if (line.every((cell) => cell === "X")) {
-      return "X";
+    const values = line.map(([r, c]) => board[r][c]);
+
+    if (values.every((cell) => cell === "X")) {
+      return { winner: "X", winningCells: line };
     }
 
-    if (line.every((cell) => cell === "O")) {
-      return "O";
+    if (values.every((cell) => cell === "O")) {
+      return { winner: "O", winningCells: line };
     }
   }
 
@@ -77,6 +108,7 @@ io.on("connection", (socket) => {
         board: createBoard(),
         currentTurn: "X",
         winner: null,
+        winningCells: [],
       };
     }
     // Same Player not allowed
@@ -129,10 +161,9 @@ io.on("connection", (socket) => {
       players: rooms[roomId].players,
       board: rooms[roomId].board,
       currentTurn: rooms[roomId].currentTurn,
+      winner: rooms[roomId].winner,
+      winningCells: rooms[roomId].winningCells,
     });
-    // console.log(`${username} assigned ${symbol}`);
-
-    // console.log("Current rooms:", JSON.stringify(rooms, null, 2));
   });
 
   socket.on("make-move", (data) => {
@@ -141,6 +172,7 @@ io.on("connection", (socket) => {
 
     const { roomId, rowIndex, colIndex } = data;
     const room = rooms[roomId];
+    if (!room) return;
 
     const player = room?.players.find(
       (player) => player.socketId === socket.id,
@@ -173,15 +205,16 @@ io.on("connection", (socket) => {
 
     room.board[rowIndex][colIndex] = player.symbol;
 
-    const winner = checkWinner(room.board);
+    const result = checkWinner(room.board);
 
-    if (winner) {
-      room.winner = winner;
+    if (result) {
+      room.winner = result.winner;
+      room.winningCells = result.winningCells;
     } else if (checkDraw(room.board)) {
       room.winner = "Draw";
     }
 
-    if (!winner) {
+    if (!room.winner) {
       room.currentTurn = room.currentTurn === "X" ? "O" : "X";
     }
 
@@ -191,6 +224,7 @@ io.on("connection", (socket) => {
       board: room.board,
       currentTurn: room.currentTurn,
       winner: room.winner,
+      winningCells: room.winningCells,
     });
   });
 
@@ -202,23 +236,26 @@ io.on("connection", (socket) => {
         (player) => player.socketId !== socket.id,
       );
 
+      if (room.players.length === 0) {
+        delete rooms[roomId];
+        continue;
+      }
+
       io.to(roomId).emit("room-update", {
         roomId,
         players: room.players,
         board: room.board,
         currentTurn: room.currentTurn,
+        winner: room.winner,
+        winningCells: room.winningCells,
       });
-
-      if (room.players.length === 0) {
-        delete rooms[roomId];
-      }
     }
   });
 
   socket.on("reset-game", ({ roomId }) => {
     const room = rooms[roomId];
     if (!room) return;
-
+    room.winningCells = [];
     room.board = createBoard();
     room.currentTurn = "X";
     room.winner = null;
@@ -229,6 +266,7 @@ io.on("connection", (socket) => {
       board: room.board,
       currentTurn: room.currentTurn,
       winner: room.winner,
+      winningCells: room.winningCells,
     });
   });
 
@@ -260,6 +298,7 @@ io.on("connection", (socket) => {
       board: room.board,
       currentTurn: room.currentTurn,
       winner: room.winner,
+      winningCells: room.winningCells,
     });
   });
 });
