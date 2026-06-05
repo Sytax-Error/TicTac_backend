@@ -1,9 +1,3 @@
-
----
-
-# Backend `README.md`
-
-```md
 # Multiplayer Tic Tac Toe Backend
 
 This is the backend server for a real-time multiplayer Tic Tac Toe game.
