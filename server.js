@@ -109,6 +109,10 @@ io.on("connection", (socket) => {
         currentTurn: "X",
         winner: null,
         winningCells: [],
+        score: {
+          X: 0,
+          O: 0,
+        },
       };
     }
     // Same Player not allowed
@@ -163,6 +167,7 @@ io.on("connection", (socket) => {
       currentTurn: rooms[roomId].currentTurn,
       winner: rooms[roomId].winner,
       winningCells: rooms[roomId].winningCells,
+      score: rooms[roomId].score,
     });
   });
 
@@ -210,6 +215,7 @@ io.on("connection", (socket) => {
     if (result) {
       room.winner = result.winner;
       room.winningCells = result.winningCells;
+      room.score[result.winner] += 1;
     } else if (checkDraw(room.board)) {
       room.winner = "Draw";
     }
@@ -225,6 +231,7 @@ io.on("connection", (socket) => {
       currentTurn: room.currentTurn,
       winner: room.winner,
       winningCells: room.winningCells,
+      score: room.score,
     });
   });
 
@@ -248,6 +255,7 @@ io.on("connection", (socket) => {
         currentTurn: room.currentTurn,
         winner: room.winner,
         winningCells: room.winningCells,
+        score: room.score,
       });
     }
   });
@@ -267,6 +275,7 @@ io.on("connection", (socket) => {
       currentTurn: room.currentTurn,
       winner: room.winner,
       winningCells: room.winningCells,
+      score: room.score,
     });
   });
 
@@ -299,6 +308,7 @@ io.on("connection", (socket) => {
       currentTurn: room.currentTurn,
       winner: room.winner,
       winningCells: room.winningCells,
+      score: room.score,
     });
   });
 });
